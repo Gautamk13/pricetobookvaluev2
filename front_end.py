@@ -218,10 +218,14 @@ if mode == "Filter Manually":
     )
     
     # Get available exit params for this method
+    # Convert filter values to match dataframe types
+    lookback_float = float(lookback)
+    threshold_float = float(threshold)
+    
     method_df = master_df[
-        (master_df["lookback_quarters"] == lookback) &
-        (master_df["threshold"] == threshold) &
-        (master_df["exit_method"] == exit_method)
+        (pd.to_numeric(master_df["lookback_quarters"], errors='coerce') == lookback_float) &
+        (pd.to_numeric(master_df["threshold"], errors='coerce') == threshold_float) &
+        (master_df["exit_method"].astype(str) == str(exit_method))
     ]
     
     if method_df.empty:
