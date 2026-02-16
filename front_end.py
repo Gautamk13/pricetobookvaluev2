@@ -62,7 +62,10 @@ def load_benchmark():
 @st.cache_data
 def load_master_results():
     try:
-        df = pd.read_csv("master_results.csv")
+        # Skip the first blank line and read the CSV
+        df = pd.read_csv("master_results.csv", skiprows=1)
+        # Strip any whitespace from column names
+        df.columns = df.columns.str.strip()
         return df
     except FileNotFoundError:
         st.error("❌ master_results.csv not found. Please run the backtest first.")
@@ -104,8 +107,11 @@ master_df = load_master_results()
 
 # Check if dataframe has required columns
 required_cols = ["lookback_quarters", "threshold", "exit_method", "exit_param"]
-if not all(col in master_df.columns for col in required_cols):
-    st.error("❌ Master results file is missing required columns. Please regenerate with code_v2.py")
+missing_cols = [col for col in required_cols if col not in master_df.columns]
+if missing_cols:
+    st.error(f"❌ Master results file is missing required columns: {missing_cols}")
+    st.error(f"Found columns: {list(master_df.columns)}")
+    st.error("Please regenerate with code_v2.py")
     st.stop()
 
 # ---------------------- Sidebar Features ----------------------
