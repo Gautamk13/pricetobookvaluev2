@@ -278,6 +278,9 @@ if mode == "Filter Manually":
         # Drop the temporary numeric columns
         if not selected.empty:
             selected = selected.drop(columns=["lookback_quarters_num", "threshold_num"], errors='ignore')
+        else:
+            st.warning(f"⚠️ No strategy found with these exact parameters.")
+            st.info(f"Debug: Lookback={lookback_float}, Threshold={threshold_float}, Exit Method={exit_method}, Exit Param={exit_param}")
 
 # ---------------------- Mode 2: Best Strategy Finder ----------------------
 else:
@@ -432,27 +435,54 @@ else:
     cagr_col = "CAGR" if "CAGR" in selected.columns else None
     sharpe_col = "Sharpe" if "Sharpe" in selected.columns else None
     calmar_col = "Calmar" if "Calmar" in selected.columns else None
-    dd_col = "max_drawdown" if "max_drawdown" in selected.columns else "Max Drawdown"
-    trades_col = "num_trades" if "num_trades" in selected.columns else "Trades"
+    dd_col = "max_drawdown" if "max_drawdown" in selected.columns else ("Max Drawdown" if "Max Drawdown" in selected.columns else None)
+    trades_col = "num_trades" if "num_trades" in selected.columns else ("Trades" if "Trades" in selected.columns else None)
     
     with metrics_col1:
         if cagr_col:
-            cagr_val = selected[cagr_col].values[0]
-            st.metric("CAGR", safe_format_percent(cagr_val), 
+            try:
+                cagr_val = selected[cagr_col].values[0]
+                cagr_display = safe_format_percent(cagr_val)
+            except (IndexError, KeyError, ValueError, TypeError):
+                cagr_display = "N/A"
+            st.metric("CAGR", cagr_display, 
                      help="Compound Annual Growth Rate")
+        else:
+            st.metric("CAGR", "N/A", help="Compound Annual Growth Rate")
+    
     with metrics_col2:
         if sharpe_col:
-            sharpe_val = selected[sharpe_col].values[0]
-            st.metric("Sharpe Ratio", safe_format_float(sharpe_val),
+            try:
+                sharpe_val = selected[sharpe_col].values[0]
+                sharpe_display = safe_format_float(sharpe_val)
+            except (IndexError, KeyError, ValueError, TypeError):
+                sharpe_display = "N/A"
+            st.metric("Sharpe Ratio", sharpe_display,
                      help="Risk-adjusted return measure")
+        else:
+            st.metric("Sharpe Ratio", "N/A", help="Risk-adjusted return measure")
+    
     with metrics_col3:
         if calmar_col:
-            calmar_val = selected[calmar_col].values[0]
-            st.metric("Calmar Ratio", safe_format_float(calmar_val),
+            try:
+                calmar_val = selected[calmar_col].values[0]
+                calmar_display = safe_format_float(calmar_val)
+            except (IndexError, KeyError, ValueError, TypeError):
+                calmar_display = "N/A"
+            st.metric("Calmar Ratio", calmar_display,
                      help="Return to max drawdown ratio")
+        else:
+            st.metric("Calmar Ratio", "N/A", help="Return to max drawdown ratio")
+    
     with metrics_col4:
-        dd_val = selected[dd_col].values[0]
-        dd_formatted = safe_format_percent(dd_val)
+        if dd_col:
+            try:
+                dd_val = selected[dd_col].values[0]
+                dd_formatted = safe_format_percent(dd_val)
+            except (IndexError, KeyError, ValueError, TypeError):
+                dd_formatted = "N/A"
+        else:
+            dd_formatted = "N/A"
         st.metric("Max Drawdown", dd_formatted,
                  delta=dd_formatted if dd_formatted != "N/A" else None,
                  help="Maximum peak-to-trough decline")
@@ -460,13 +490,16 @@ else:
     # Additional metrics in a second row
     metrics_col5, metrics_col6, metrics_col7, metrics_col8 = st.columns(4)
     with metrics_col5:
-        try:
-            trades_val = selected[trades_col].values[0]
-            if pd.notna(trades_val):
-                trades_formatted = f"{int(float(trades_val)):,}"
-            else:
+        if trades_col:
+            try:
+                trades_val = selected[trades_col].values[0]
+                if pd.notna(trades_val):
+                    trades_formatted = f"{int(float(trades_val)):,}"
+                else:
+                    trades_formatted = "N/A"
+            except (ValueError, TypeError, KeyError, IndexError):
                 trades_formatted = "N/A"
-        except (ValueError, TypeError, KeyError):
+        else:
             trades_formatted = "N/A"
         st.metric("Total Trades", trades_formatted,
                  help="Total number of trades executed")
