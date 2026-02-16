@@ -80,11 +80,17 @@ def load_master_results():
         # Reset index
         df = df.reset_index(drop=True)
         
-        # Convert numeric columns
-        if "lookback_quarters" in df.columns:
-            df["lookback_quarters"] = pd.to_numeric(df["lookback_quarters"], errors='coerce')
-        if "threshold" in df.columns:
-            df["threshold"] = pd.to_numeric(df["threshold"], errors='coerce')
+        # Convert numeric columns to proper types
+        numeric_cols = [
+            "lookback_quarters", "threshold", "CAGR", "Sharpe", "Calmar", 
+            "max_drawdown", "Max Drawdown", "win_ratio", "num_trades", "Trades",
+            "initial_value", "final_value", "initial_capital", "na_allowed_pct",
+            "max_positions", "position_size_pct"
+        ]
+        
+        for col in numeric_cols:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
         
         return df
     except FileNotFoundError:
@@ -118,6 +124,28 @@ def load_trades(strategy_id):
             st.warning(f"Error loading trades: {e}")
             return None
     return None
+
+def safe_format_percent(value):
+    """Safely format a value as percentage, handling strings and NaN"""
+    if pd.isna(value):
+        return "N/A"
+    try:
+        # Convert to float if it's a string
+        num_val = float(value) if isinstance(value, str) else value
+        return f"{num_val:.2%}"
+    except (ValueError, TypeError):
+        return "N/A"
+
+def safe_format_float(value, decimals=2):
+    """Safely format a value as float, handling strings and NaN"""
+    if pd.isna(value):
+        return "N/A"
+    try:
+        # Convert to float if it's a string
+        num_val = float(value) if isinstance(value, str) else value
+        return f"{num_val:.{decimals}f}"
+    except (ValueError, TypeError):
+        return "N/A"
 
 # =========================
 # Streamlit Front-End
@@ -331,22 +359,23 @@ else:
     with metrics_col1:
         if cagr_col:
             cagr_val = selected[cagr_col].values[0]
-            st.metric("CAGR", f"{cagr_val:.2%}" if pd.notna(cagr_val) else "N/A", 
+            st.metric("CAGR", safe_format_percent(cagr_val), 
                      help="Compound Annual Growth Rate")
     with metrics_col2:
         if sharpe_col:
             sharpe_val = selected[sharpe_col].values[0]
-            st.metric("Sharpe Ratio", f"{sharpe_val:.2f}" if pd.notna(sharpe_val) else "N/A",
+            st.metric("Sharpe Ratio", safe_format_float(sharpe_val),
                      help="Risk-adjusted return measure")
     with metrics_col3:
         if calmar_col:
             calmar_val = selected[calmar_col].values[0]
-            st.metric("Calmar Ratio", f"{calmar_val:.2f}" if pd.notna(calmar_val) else "N/A",
+            st.metric("Calmar Ratio", safe_format_float(calmar_val),
                      help="Return to max drawdown ratio")
     with metrics_col4:
         dd_val = selected[dd_col].values[0]
-        st.metric("Max Drawdown", f"{dd_val:.2%}" if pd.notna(dd_val) else "N/A",
-                 delta=f"{dd_val:.2%}" if pd.notna(dd_val) else None,
+        dd_formatted = safe_format_percent(dd_val)
+        st.metric("Max Drawdown", dd_formatted,
+                 delta=dd_formatted if dd_formatted != "N/A" else None,
                  help="Maximum peak-to-trough decline")
     
     # Additional metrics in a second row
@@ -358,7 +387,7 @@ else:
     with metrics_col6:
         if "win_ratio" in selected.columns:
             win_ratio_val = selected["win_ratio"].values[0]
-            st.metric("Win Ratio", f"{win_ratio_val:.2%}" if pd.notna(win_ratio_val) else "N/A",
+            st.metric("Win Ratio", safe_format_percent(win_ratio_val),
                      help="Percentage of profitable trades")
     with metrics_col7:
         if "initial_value" in selected.columns:
@@ -407,17 +436,27 @@ else:
     with download_col3:
         if equity_df is not None:
             # Create a summary CSV
+            # Get values safely
+            cagr_val = selected[cagr_col].values[0] if cagr_col else None
+            sharpe_val = selected[sharpe_col].values[0] if sharpe_col else None
+            calmar_val = selected[calmar_col].values[0] if calmar_col else None
+            dd_val = selected[dd_col].values[0] if dd_col in selected.columns else None
+            win_ratio_val = selected['win_ratio'].values[0] if 'win_ratio' in selected.columns else None
+            trades_val = selected[trades_col].values[0] if trades_col in selected.columns else None
+            init_val = selected['initial_value'].values[0] if 'initial_value' in selected.columns else None
+            final_val = selected['final_value'].values[0] if 'final_value' in selected.columns else None
+            
             summary_data = {
                 'Metric': ['CAGR', 'Sharpe', 'Calmar', 'Max Drawdown', 'Win Ratio', 'Total Trades', 'Initial Value', 'Final Value'],
                 'Value': [
-                    f"{selected[cagr_col].values[0]:.2%}" if cagr_col and pd.notna(selected[cagr_col].values[0]) else "N/A",
-                    f"{selected[sharpe_col].values[0]:.2f}" if sharpe_col and pd.notna(selected[sharpe_col].values[0]) else "N/A",
-                    f"{selected[calmar_col].values[0]:.2f}" if calmar_col and pd.notna(selected[calmar_col].values[0]) else "N/A",
-                    f"{selected[dd_col].values[0]:.2%}" if pd.notna(selected[dd_col].values[0]) else "N/A",
-                    f"{selected['win_ratio'].values[0]:.2%}" if 'win_ratio' in selected.columns and pd.notna(selected['win_ratio'].values[0]) else "N/A",
-                    f"{int(selected[trades_col].values[0])}" if pd.notna(selected[trades_col].values[0]) else "N/A",
-                    f"₹{selected['initial_value'].values[0]:,.0f}" if 'initial_value' in selected.columns and pd.notna(selected['initial_value'].values[0]) else "N/A",
-                    f"₹{selected['final_value'].values[0]:,.0f}" if 'final_value' in selected.columns and pd.notna(selected['final_value'].values[0]) else "N/A"
+                    safe_format_percent(cagr_val) if cagr_val is not None else "N/A",
+                    safe_format_float(sharpe_val) if sharpe_val is not None else "N/A",
+                    safe_format_float(calmar_val) if calmar_val is not None else "N/A",
+                    safe_format_percent(dd_val) if dd_val is not None else "N/A",
+                    safe_format_percent(win_ratio_val) if win_ratio_val is not None else "N/A",
+                    f"{int(float(trades_val)):,}" if trades_val is not None and pd.notna(trades_val) else "N/A",
+                    f"₹{float(init_val):,.0f}" if init_val is not None and pd.notna(init_val) else "N/A",
+                    f"₹{float(final_val):,.0f}" if final_val is not None and pd.notna(final_val) else "N/A"
                 ]
             }
             summary_df = pd.DataFrame(summary_data)
@@ -475,13 +514,13 @@ else:
             benchmark_return = (merged["benchmark_normalized"].iloc[-1] - 1) * 100
             
             with comp_col1:
-                st.metric("Strategy Return", f"{strategy_return:.2f}%")
+                st.metric("Strategy Return", f"{float(strategy_return):.2f}%")
             with comp_col2:
-                st.metric("Benchmark Return", f"{benchmark_return:.2f}%")
+                st.metric("Benchmark Return", f"{float(benchmark_return):.2f}%")
             with comp_col3:
                 excess_return = strategy_return - benchmark_return
-                st.metric("Excess Return", f"{excess_return:.2f}%", 
-                         delta=f"{excess_return:.2f}%")
+                st.metric("Excess Return", f"{float(excess_return):.2f}%", 
+                         delta=f"{float(excess_return):.2f}%")
     else:
         st.warning(f"⚠️ Equity curve not found for strategy: {strategy_id}")
 
