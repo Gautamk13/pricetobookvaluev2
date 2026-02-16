@@ -62,22 +62,29 @@ def load_benchmark():
 @st.cache_data
 def load_master_results():
     try:
-        # Read the CSV file
-        # First, try reading normally
-        df = pd.read_csv("master_results.csv")
+        # Read the CSV file - skip the first blank line
+        # The file has a blank first line, then header on line 2
+        df = pd.read_csv("master_results.csv", skiprows=[0])
         
-        # If first row is empty or has wrong columns, skip it
-        if df.empty or df.columns[0].startswith('Unnamed'):
-            df = pd.read_csv("master_results.csv", skiprows=1)
-        
-        # Strip any whitespace from column names
+        # Strip any whitespace from column names and values
         df.columns = df.columns.str.strip()
         
         # Remove any completely empty rows
         df = df.dropna(how='all')
         
+        # Remove rows where all key columns are NaN
+        key_cols = ["lookback_quarters", "threshold", "exit_method", "exit_param"]
+        if all(col in df.columns for col in key_cols):
+            df = df.dropna(subset=key_cols, how='all')
+        
         # Reset index
         df = df.reset_index(drop=True)
+        
+        # Convert numeric columns
+        if "lookback_quarters" in df.columns:
+            df["lookback_quarters"] = pd.to_numeric(df["lookback_quarters"], errors='coerce')
+        if "threshold" in df.columns:
+            df["threshold"] = pd.to_numeric(df["threshold"], errors='coerce')
         
         return df
     except FileNotFoundError:
