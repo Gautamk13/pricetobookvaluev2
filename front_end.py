@@ -243,11 +243,16 @@ if mode == "Filter Manually":
                 help="Profit percentage target to exit (e.g., 10pct = 10% gain)"
             )
         
+        # Convert filter values to match dataframe types
+        lookback_float = float(lookback)
+        threshold_float = float(threshold)
+        
+        # Filter with proper type matching
         selected = master_df[
-            (master_df["lookback_quarters"] == lookback) &
-            (master_df["threshold"] == threshold) &
-            (master_df["exit_method"] == exit_method) &
-            (master_df["exit_param"] == exit_param)
+            (pd.to_numeric(master_df["lookback_quarters"], errors='coerce') == lookback_float) &
+            (pd.to_numeric(master_df["threshold"], errors='coerce') == threshold_float) &
+            (master_df["exit_method"].astype(str) == str(exit_method)) &
+            (master_df["exit_param"].astype(str) == str(exit_param))
         ]
 
 # ---------------------- Mode 2: Best Strategy Finder ----------------------
@@ -308,15 +313,22 @@ else:
 if selected.empty:
     st.warning("⚠️ No strategy found matching your criteria.")
 else:
-    lookback = selected["lookback_quarters"].values[0]
-    threshold = selected["threshold"].values[0]
-    exit_method = selected["exit_method"].values[0]
-    exit_param = selected["exit_param"].values[0]
+    # Safely extract values with type conversion
+    try:
+        lookback = float(selected["lookback_quarters"].values[0])
+        threshold = float(selected["threshold"].values[0])
+        exit_method = str(selected["exit_method"].values[0])
+        exit_param = str(selected["exit_param"].values[0])
+    except (IndexError, KeyError, ValueError) as e:
+        st.error(f"❌ Error extracting strategy parameters: {e}")
+        st.error(f"Selected dataframe shape: {selected.shape}")
+        st.error(f"Selected columns: {list(selected.columns)}")
+        st.stop()
     
     # Build strategy ID based on exit method
     # Convert lookback to int to avoid L1.0 format
-    lookback_int = int(float(lookback))
-    threshold_int = int(float(threshold) * 100)
+    lookback_int = int(lookback)
+    threshold_int = int(threshold * 100)
     
     if exit_method == "holding_period":
         strategy_id = f"L{lookback_int}_th{threshold_int}_{exit_param}"
@@ -332,9 +344,13 @@ else:
     st.subheader("⚙️ Strategy Parameters")
     param_col1, param_col2, param_col3, param_col4 = st.columns(4)
     with param_col1:
-        st.metric("Lookback Quarters", f"{lookback}Q", help="Historical quarters for P/BV calculation")
+        st.metric("Lookback Quarters", f"{lookback_int}Q", help="Historical quarters for P/BV calculation")
     with param_col2:
-        st.metric("Buy Threshold", f"{threshold:.0%}", help="P/BV threshold to trigger buy")
+        try:
+            threshold_pct = f"{threshold:.0%}"
+        except (ValueError, TypeError):
+            threshold_pct = f"{threshold*100:.0f}%"
+        st.metric("Buy Threshold", threshold_pct, help="P/BV threshold to trigger buy")
     with param_col3:
         exit_method_display = exit_method.replace("_", " ").title()
         if exit_method == "holding_period":
@@ -385,8 +401,15 @@ else:
     # Additional metrics in a second row
     metrics_col5, metrics_col6, metrics_col7, metrics_col8 = st.columns(4)
     with metrics_col5:
-        trades_val = selected[trades_col].values[0]
-        st.metric("Total Trades", f"{int(trades_val):,}" if pd.notna(trades_val) else "N/A",
+        try:
+            trades_val = selected[trades_col].values[0]
+            if pd.notna(trades_val):
+                trades_formatted = f"{int(float(trades_val)):,}"
+            else:
+                trades_formatted = "N/A"
+        except (ValueError, TypeError, KeyError):
+            trades_formatted = "N/A"
+        st.metric("Total Trades", trades_formatted,
                  help="Total number of trades executed")
     with metrics_col6:
         if "win_ratio" in selected.columns:
