@@ -262,12 +262,22 @@ if mode == "Filter Manually":
         threshold_float = float(threshold)
         
         # Filter with proper type matching
-        selected = master_df[
-            (pd.to_numeric(master_df["lookback_quarters"], errors='coerce') == lookback_float) &
-            (pd.to_numeric(master_df["threshold"], errors='coerce') == threshold_float) &
-            (master_df["exit_method"].astype(str) == str(exit_method)) &
-            (master_df["exit_param"].astype(str) == str(exit_param))
+        # Filter with proper type matching
+        # Convert columns to numeric for comparison
+        master_df_filtered = master_df.copy()
+        master_df_filtered["lookback_quarters_num"] = pd.to_numeric(master_df_filtered["lookback_quarters"], errors='coerce')
+        master_df_filtered["threshold_num"] = pd.to_numeric(master_df_filtered["threshold"], errors='coerce')
+        
+        selected = master_df_filtered[
+            (master_df_filtered["lookback_quarters_num"] == lookback_float) &
+            (master_df_filtered["threshold_num"] == threshold_float) &
+            (master_df_filtered["exit_method"].astype(str).str.strip() == str(exit_method).strip()) &
+            (master_df_filtered["exit_param"].astype(str).str.strip() == str(exit_param).strip())
         ]
+        
+        # Drop the temporary numeric columns
+        if not selected.empty:
+            selected = selected.drop(columns=["lookback_quarters_num", "threshold_num"], errors='ignore')
 
 # ---------------------- Mode 2: Best Strategy Finder ----------------------
 else:
