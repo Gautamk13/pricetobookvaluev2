@@ -339,7 +339,20 @@ else:
 # ---------------------- Display Strategy Results ----------------------
 if selected.empty:
     st.warning("⚠️ No strategy found matching your criteria.")
+    # Debug information
+    with st.expander("🔍 Debug Information"):
+        st.write("**Master DataFrame Info:**")
+        st.write(f"Shape: {master_df.shape}")
+        st.write(f"Columns: {list(master_df.columns)}")
+        st.write(f"Sample rows:")
+        st.dataframe(master_df.head())
 else:
+    # Debug: Show what was selected (can be removed later)
+    if st.sidebar.checkbox("🔍 Show Debug Info", False):
+        st.sidebar.write("**Selected Strategy:**")
+        st.sidebar.dataframe(selected)
+        st.sidebar.write(f"**Columns:** {list(selected.columns)}")
+        st.sidebar.write(f"**Shape:** {selected.shape}")
     # Safely extract values with type conversion
     try:
         lookback_raw = selected["lookback_quarters"].values[0]
