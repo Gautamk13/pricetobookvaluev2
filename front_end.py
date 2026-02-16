@@ -36,6 +36,21 @@ st.markdown("""
         border-radius: 0.5rem;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
+    .stMetric label {
+        color: #000000 !important;
+    }
+    .stMetric [data-testid="stMetricValue"] {
+        color: #000000 !important;
+    }
+    .stMetric [data-testid="stMetricDelta"] {
+        color: #000000 !important;
+    }
+    div[data-testid="stMetricValue"] {
+        color: #000000 !important;
+    }
+    div[data-testid="stMetricLabel"] {
+        color: #000000 !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
