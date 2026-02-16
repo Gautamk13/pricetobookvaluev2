@@ -392,12 +392,26 @@ else:
     with metrics_col7:
         if "initial_value" in selected.columns:
             init_val = selected["initial_value"].values[0]
-            st.metric("Initial Capital", f"₹{init_val:,.0f}" if pd.notna(init_val) else "N/A")
+            try:
+                init_formatted = f"₹{float(init_val):,.0f}" if pd.notna(init_val) else "N/A"
+            except (ValueError, TypeError):
+                init_formatted = "N/A"
+            st.metric("Initial Capital", init_formatted)
     with metrics_col8:
         if "final_value" in selected.columns:
             final_val = selected["final_value"].values[0]
-            st.metric("Final Value", f"₹{final_val:,.0f}" if pd.notna(final_val) else "N/A",
-                     delta=f"₹{final_val - selected['initial_value'].values[0]:,.0f}" if pd.notna(final_val) and "initial_value" in selected.columns else None)
+            try:
+                final_formatted = f"₹{float(final_val):,.0f}" if pd.notna(final_val) else "N/A"
+                if pd.notna(final_val) and "initial_value" in selected.columns:
+                    init_val = selected["initial_value"].values[0]
+                    delta_val = float(final_val) - float(init_val) if pd.notna(init_val) else None
+                    delta_formatted = f"₹{delta_val:,.0f}" if delta_val is not None else None
+                else:
+                    delta_formatted = None
+            except (ValueError, TypeError):
+                final_formatted = "N/A"
+                delta_formatted = None
+            st.metric("Final Value", final_formatted, delta=delta_formatted)
 
     # Load Equity Curve and Trades
     equity_df = load_equity_curve(strategy_id)
