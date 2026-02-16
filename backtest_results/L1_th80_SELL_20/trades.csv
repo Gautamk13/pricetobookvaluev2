@@ -1,0 +1,12 @@
+stock,entry_date,exit_date,holding_days,exit_reason,invested,exit_value,pnl,return_pct
+Adani Enterprises Limited,2004-07-28,2008-01-02,1253,sell_threshold,50000.0,1032541.0609991471,982541.0609991471,19.65082121998294
+Shree Rama Multi-Tech Limited ,2006-06-13,2014-05-27,2905,sell_threshold,50000.0,50000.0,0.0,0.0
+Rollatainers Limited,2013-10-23,2015-01-01,435,sell_threshold,50000.0,49999.99999999999,-7.275957614183426e-12,-1.1102230246251565e-16
+Shree Rama Multi-Tech Limited ,2015-11-06,2016-01-04,59,sell_threshold,50000.0,50000.0,0.0,0.0
+Trigyn Technologies Limited,2001-04-30,2017-05-15,5859,sell_threshold,50000.0,63502.88831835687,13502.888318356869,0.2700577663671373
+Handson Global Management (HGM) Limited ,2015-05-22,2017-05-22,731,sell_threshold,50000.0,50000.0,0.0,0.0
+Borosil Renewables Limited,2020-03-24,2020-06-26,94,sell_threshold,50000.0,233341.24600050642,183341.24600050642,3.6668249200101286
+Adani Enterprises Limited,2015-06-03,2021-02-02,2071,sell_threshold,50000.0,256993.1599706257,206993.1599706257,4.139863199412514
+Jindal Photo Limited ,2019-05-30,2021-03-09,649,sell_threshold,50000.0,50000.0,0.0,0.0
+Precot Limited ,2018-05-21,2021-11-02,1261,sell_threshold,50000.0,50000.0,0.0,0.0
+Indian Infotech and Software Limited,2015-01-01,2021-12-20,2545,sell_threshold,50000.0,50000.0,0.0,0.0

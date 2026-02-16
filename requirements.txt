@@ -1,0 +1,11 @@
+streamlit
+pandas
+matplotlib
+numpy
+<<<<<<< HEAD
+tqdm
+
+=======
+>>>>>>> d4aeb5712c4c0f51302106981294c50967235a43
+
+
