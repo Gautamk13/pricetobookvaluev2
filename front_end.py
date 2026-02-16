@@ -62,16 +62,31 @@ def load_benchmark():
 @st.cache_data
 def load_master_results():
     try:
-        # Skip the first blank line and read the CSV
-        df = pd.read_csv("master_results.csv", skiprows=1)
+        # Read the CSV file
+        # First, try reading normally
+        df = pd.read_csv("master_results.csv")
+        
+        # If first row is empty or has wrong columns, skip it
+        if df.empty or df.columns[0].startswith('Unnamed'):
+            df = pd.read_csv("master_results.csv", skiprows=1)
+        
         # Strip any whitespace from column names
         df.columns = df.columns.str.strip()
+        
+        # Remove any completely empty rows
+        df = df.dropna(how='all')
+        
+        # Reset index
+        df = df.reset_index(drop=True)
+        
         return df
     except FileNotFoundError:
         st.error("❌ master_results.csv not found. Please run the backtest first.")
         st.stop()
     except Exception as e:
         st.error(f"❌ Error loading results: {e}")
+        import traceback
+        st.error(f"Traceback: {traceback.format_exc()}")
         st.stop()
 
 def load_equity_curve(strategy_id):
@@ -105,13 +120,24 @@ st.markdown('<h1 class="main-header">📈 P/BV Backtest Result Dashboard</h1>', 
 # Load master results
 master_df = load_master_results()
 
+# Check if dataframe is empty
+if master_df.empty:
+    st.error("❌ Master results file is empty. Please regenerate with code_v2.py")
+    st.stop()
+
 # Check if dataframe has required columns
 required_cols = ["lookback_quarters", "threshold", "exit_method", "exit_param"]
 missing_cols = [col for col in required_cols if col not in master_df.columns]
 if missing_cols:
     st.error(f"❌ Master results file is missing required columns: {missing_cols}")
     st.error(f"Found columns: {list(master_df.columns)}")
+    st.error(f"DataFrame shape: {master_df.shape}")
     st.error("Please regenerate with code_v2.py")
+    st.stop()
+
+# Ensure threshold column has valid data
+if master_df["threshold"].isna().all():
+    st.error("❌ Threshold column contains only NaN values")
     st.stop()
 
 # ---------------------- Sidebar Features ----------------------
@@ -127,14 +153,25 @@ mode = st.sidebar.radio(
 if mode == "Filter Manually":
     st.sidebar.subheader("🔍 Filter Parameters")
     
+    # Get unique values safely
+    lookback_values = master_df["lookback_quarters"].dropna().unique()
+    threshold_values = master_df["threshold"].dropna().unique()
+    
+    if len(lookback_values) == 0:
+        st.error("❌ No lookback_quarters values found in data")
+        st.stop()
+    if len(threshold_values) == 0:
+        st.error("❌ No threshold values found in data")
+        st.stop()
+    
     lookback = st.sidebar.selectbox(
         "Select Lookback Quarters", 
-        sorted(master_df["lookback_quarters"].unique()),
+        sorted(lookback_values),
         help="Number of quarters to look back for P/BV calculation"
     )
     threshold = st.sidebar.selectbox(
         "Select Threshold", 
-        sorted(master_df["threshold"].unique()),
+        sorted(threshold_values),
         help="P/BV threshold for buy signal (lower is better)"
     )
     
