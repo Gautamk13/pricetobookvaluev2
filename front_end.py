@@ -62,7 +62,7 @@ def load_benchmark():
 @st.cache_data
 def load_master_results():
     try:
-        df = pd.read_csv("backtest_results/master_results.csv")
+        df = pd.read_csv("master_results.csv")
         return df
     except FileNotFoundError:
         st.error("❌ master_results.csv not found. Please run the backtest first.")
