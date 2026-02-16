@@ -314,12 +314,16 @@ else:
     exit_param = selected["exit_param"].values[0]
     
     # Build strategy ID based on exit method
+    # Convert lookback to int to avoid L1.0 format
+    lookback_int = int(float(lookback))
+    threshold_int = int(float(threshold) * 100)
+    
     if exit_method == "holding_period":
-        strategy_id = f"L{lookback}_th{int(threshold*100)}_{exit_param}"
+        strategy_id = f"L{lookback_int}_th{threshold_int}_{exit_param}"
     else:
         # exit_param is like "10pct", extract the number
         pct_value = exit_param.replace("pct", "")
-        strategy_id = f"L{lookback}_th{int(threshold*100)}_SELL_{pct_value}"
+        strategy_id = f"L{lookback_int}_th{threshold_int}_SELL_{pct_value}"
     
     # Header with Strategy ID
     st.markdown(f"### 📌 Strategy ID: `{strategy_id}`")
