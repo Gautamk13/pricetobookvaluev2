@@ -188,9 +188,9 @@ mode = st.sidebar.radio(
 if mode == "Filter Manually":
     st.sidebar.subheader("🔍 Filter Parameters")
     
-    # Get unique values safely
-    lookback_values = master_df["lookback_quarters"].dropna().unique()
-    threshold_values = master_df["threshold"].dropna().unique()
+    # Get unique values safely and convert to proper types
+    lookback_values = pd.to_numeric(master_df["lookback_quarters"].dropna(), errors='coerce').unique()
+    threshold_values = pd.to_numeric(master_df["threshold"].dropna(), errors='coerce').unique()
     
     if len(lookback_values) == 0:
         st.error("❌ No lookback_quarters values found in data")
@@ -199,14 +199,24 @@ if mode == "Filter Manually":
         st.error("❌ No threshold values found in data")
         st.stop()
     
+    # Sort and format for display
+    lookback_sorted = sorted([float(x) for x in lookback_values if pd.notna(x)])
+    threshold_sorted = sorted([float(x) for x in threshold_values if pd.notna(x)])
+    
+    # Create display labels (integers for lookback, percentages for threshold)
+    lookback_options = [int(x) if x == int(x) else x for x in lookback_sorted]
+    threshold_options = threshold_sorted
+    
     lookback = st.sidebar.selectbox(
         "Select Lookback Quarters", 
-        sorted(lookback_values),
+        lookback_options,
+        format_func=lambda x: f"{int(x)}" if x == int(x) else f"{x}",
         help="Number of quarters to look back for P/BV calculation"
     )
     threshold = st.sidebar.selectbox(
         "Select Threshold", 
-        sorted(threshold_values),
+        threshold_options,
+        format_func=lambda x: f"{x:.0%}",
         help="P/BV threshold for buy signal (lower is better)"
     )
     
@@ -348,7 +358,7 @@ else:
     st.subheader("⚙️ Strategy Parameters")
     param_col1, param_col2, param_col3, param_col4 = st.columns(4)
     with param_col1:
-        st.metric("Lookback Quarters", f"{lookback_int}Q", help="Historical quarters for P/BV calculation")
+        st.metric("Lookback Quarters", f"{lookback_int}", help="Historical quarters for P/BV calculation")
     with param_col2:
         try:
             threshold_pct = f"{threshold:.0%}"
