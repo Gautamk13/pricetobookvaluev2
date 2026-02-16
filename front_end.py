@@ -3,27 +3,64 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 import os
+from datetime import datetime
+
+# Set page config
+st.set_page_config(
+    page_title="P/BV Backtest Dashboard",
+    page_icon="📈",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Custom CSS for better styling
+st.markdown("""
+    <style>
+    .main-header {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #1f77b4;
+        margin-bottom: 1rem;
+    }
+    .metric-card {
+        background-color: #f0f2f6;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        border-left: 4px solid #1f77b4;
+    }
+    .stMetric {
+        background-color: white;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # =========================
-<<<<<<< HEAD
-=======
 # Load Benchmark File (NIFTY)
 # =========================
 @st.cache_data
 def load_benchmark():
-    df = pd.read_csv("benchmark_nifty.csv", parse_dates=["date"])
-    df = df.sort_values("date")
-    df["benchmark_normalized"] = df["equity"] / df["equity"].iloc[0]
-    return df
+    try:
+        df = pd.read_csv("benchmark_nifty.csv", parse_dates=["date"])
+        df = df.sort_values("date")
+        df["benchmark_normalized"] = df["equity"] / df["equity"].iloc[0]
+        return df
+    except FileNotFoundError:
+        st.warning("⚠️ Benchmark file not found. Benchmark comparison will be disabled.")
+        return None
+    except Exception as e:
+        st.warning(f"⚠️ Error loading benchmark: {e}")
+        return None
 
 # =========================
->>>>>>> d4aeb5712c4c0f51302106981294c50967235a43
 # Load Master File (Summary)
 # =========================
 @st.cache_data
 def load_master_results():
-<<<<<<< HEAD
     try:
         df = pd.read_csv("backtest_results/master_results.csv")
         return df
@@ -33,16 +70,14 @@ def load_master_results():
     except Exception as e:
         st.error(f"❌ Error loading results: {e}")
         st.stop()
-=======
-    return pd.read_csv("backtest_results/master_results.csv")
->>>>>>> d4aeb5712c4c0f51302106981294c50967235a43
 
 def load_equity_curve(strategy_id):
     path = f"backtest_results/{strategy_id}/equity_curve.csv"
     if os.path.exists(path):
-<<<<<<< HEAD
         try:
-            df = pd.read_csv(path, index_col=0, parse_dates=True)
+            df = pd.read_csv(path, parse_dates=["date"])
+            df = df.sort_values("date")
+            df["strategy_normalized"] = df["equity"] / df["equity"].iloc[0]
             return df
         except Exception as e:
             st.warning(f"Error loading equity curve: {e}")
@@ -52,65 +87,56 @@ def load_equity_curve(strategy_id):
 def load_trades(strategy_id):
     path = f"backtest_results/{strategy_id}/trades.csv"
     if os.path.exists(path):
-        return pd.read_csv(path)
-=======
-        df = pd.read_csv(path, parse_dates=["date"])
-        df = df.sort_values("date")
-        df["strategy_normalized"] = df["equity"] / df["equity"].iloc[0]
-        return df
->>>>>>> d4aeb5712c4c0f51302106981294c50967235a43
+        try:
+            return pd.read_csv(path, parse_dates=["entry_date", "exit_date"])
+        except Exception as e:
+            st.warning(f"Error loading trades: {e}")
+            return None
     return None
 
 # =========================
 # Streamlit Front-End
 # =========================
-<<<<<<< HEAD
-st.set_page_config(
-    page_title="P/BV Backtest Dashboard",
-    page_icon="📈",
-    layout="wide"
-)
-
-=======
->>>>>>> d4aeb5712c4c0f51302106981294c50967235a43
-st.title("📈 P/BV Backtest Result Dashboard")
+st.markdown('<h1 class="main-header">📈 P/BV Backtest Result Dashboard</h1>', unsafe_allow_html=True)
 
 # Load master results
 master_df = load_master_results()
 
-<<<<<<< HEAD
 # Check if dataframe has required columns
 required_cols = ["lookback_quarters", "threshold", "exit_method", "exit_param"]
 if not all(col in master_df.columns for col in required_cols):
     st.error("❌ Master results file is missing required columns. Please regenerate with code_v2.py")
     st.stop()
 
-=======
->>>>>>> d4aeb5712c4c0f51302106981294c50967235a43
 # ---------------------- Sidebar Features ----------------------
 st.sidebar.header("📊 Strategy Selection")
 
 mode = st.sidebar.radio(
     "Select Mode:",
-    ("Filter Manually", "Filter by Best")
+    ("Filter Manually", "Filter by Best"),
+    help="Choose to manually filter strategies or find the best one by a metric"
 )
 
 # ---------------------- Mode 1: Manual Selection ----------------------
 if mode == "Filter Manually":
-<<<<<<< HEAD
+    st.sidebar.subheader("🔍 Filter Parameters")
+    
     lookback = st.sidebar.selectbox(
         "Select Lookback Quarters", 
-        sorted(master_df["lookback_quarters"].unique())
+        sorted(master_df["lookback_quarters"].unique()),
+        help="Number of quarters to look back for P/BV calculation"
     )
     threshold = st.sidebar.selectbox(
         "Select Threshold", 
-        sorted(master_df["threshold"].unique())
+        sorted(master_df["threshold"].unique()),
+        help="P/BV threshold for buy signal (lower is better)"
     )
     
     # Filter by exit method
     exit_method = st.sidebar.selectbox(
         "Select Exit Method",
-        ["holding_period", "sell_threshold"]
+        ["holding_period", "sell_threshold"],
+        help="Time-based exit (holding_period) or profit target exit (sell_threshold)"
     )
     
     # Get available exit params for this method
@@ -121,11 +147,23 @@ if mode == "Filter Manually":
     ]
     
     if method_df.empty:
-        st.warning("No strategies found with these parameters.")
+        st.warning("⚠️ No strategies found with these parameters.")
         selected = pd.DataFrame()
     else:
         exit_params = sorted(method_df["exit_param"].unique())
-        exit_param = st.sidebar.selectbox("Select Exit Parameter", exit_params)
+        
+        if exit_method == "holding_period":
+            exit_param = st.sidebar.selectbox(
+                "Select Holding Period", 
+                exit_params,
+                help="Time period to hold the position (1Q=1 Quarter, 2Y=2 Years, etc.)"
+            )
+        else:
+            exit_param = st.sidebar.selectbox(
+                "Select Profit Target", 
+                exit_params,
+                help="Profit percentage target to exit (e.g., 10pct = 10% gain)"
+            )
         
         selected = master_df[
             (master_df["lookback_quarters"] == lookback) &
@@ -133,24 +171,12 @@ if mode == "Filter Manually":
             (master_df["exit_method"] == exit_method) &
             (master_df["exit_param"] == exit_param)
         ]
-=======
-    lookback = st.selectbox("Select Lookback Quarters", sorted(master_df["lookback_quarters"].unique()))
-    threshold = st.selectbox("Select Threshold", sorted(master_df["threshold"].unique()))
-    holding = st.selectbox("Select Holding Period", sorted(master_df["holding_period"].unique()))
-
-    selected = master_df[
-        (master_df["lookback_quarters"] == lookback) &
-        (master_df["threshold"] == threshold) &
-        (master_df["holding_period"] == holding)
-    ]
->>>>>>> d4aeb5712c4c0f51302106981294c50967235a43
 
 # ---------------------- Mode 2: Best Strategy Finder ----------------------
 else:
-    st.sidebar.write("📌 Choose Optimization Criteria")
-<<<<<<< HEAD
+    st.sidebar.subheader("🏆 Find Best Strategy")
     
-    # Get available metrics (handle both old and new column names)
+    # Get available metrics
     available_metrics = []
     metric_mapping = {}
     
@@ -158,29 +184,30 @@ else:
         available_metrics.append("CAGR")
         metric_mapping["CAGR"] = "CAGR"
     if "Sharpe" in master_df.columns:
-        available_metrics.append("Sharpe")
-        metric_mapping["Sharpe"] = "Sharpe"
+        available_metrics.append("Sharpe Ratio")
+        metric_mapping["Sharpe Ratio"] = "Sharpe"
     if "Calmar" in master_df.columns:
-        available_metrics.append("Calmar")
-        metric_mapping["Calmar"] = "Calmar"
+        available_metrics.append("Calmar Ratio")
+        metric_mapping["Calmar Ratio"] = "Calmar"
     if "max_drawdown" in master_df.columns:
         available_metrics.append("Max Drawdown (Minimize)")
         metric_mapping["Max Drawdown (Minimize)"] = "max_drawdown"
     elif "Max Drawdown" in master_df.columns:
         available_metrics.append("Max Drawdown (Minimize)")
         metric_mapping["Max Drawdown (Minimize)"] = "Max Drawdown"
-    if "num_trades" in master_df.columns:
-        available_metrics.append("Trades")
-        metric_mapping["Trades"] = "num_trades"
-    elif "Trades" in master_df.columns:
-        available_metrics.append("Trades")
-        metric_mapping["Trades"] = "Trades"
+    if "win_ratio" in master_df.columns:
+        available_metrics.append("Win Ratio")
+        metric_mapping["Win Ratio"] = "win_ratio"
     
     if not available_metrics:
         st.error("No valid metrics found in results file.")
         selected = pd.DataFrame()
     else:
-        criteria = st.sidebar.selectbox("Optimize by:", available_metrics)
+        criteria = st.sidebar.selectbox(
+            "Optimize by:", 
+            available_metrics,
+            help="Select the metric to optimize for"
+        )
         metric_col = metric_mapping[criteria]
         
         # Filter out NaN values
@@ -197,58 +224,49 @@ else:
                 selected = valid_df.loc[valid_df[metric_col].idxmax()]
             
             selected = pd.DataFrame([selected])  # convert to DataFrame
-            st.success(f"🏆 Best Strategy Selected by **{criteria}**")
+            st.success(f"🏆 **Best Strategy Selected by {criteria}**")
 
 # ---------------------- Display Strategy Results ----------------------
-=======
-    criteria = st.sidebar.selectbox(
-        "Optimize by:",
-        ["CAGR", "Sharpe", "Calmar", "Max Drawdown (Minimize)", "Trades"]
-    )
-
-    if criteria == "Max Drawdown (Minimize)":
-        selected = master_df.loc[master_df["Max Drawdown"].idxmax()]
-    else:
-        selected = master_df.loc[master_df[criteria].idxmax()]
-
-    selected = pd.DataFrame([selected])  # convert to DataFrame
-
-    st.success(f"🏆 Best Strategy Selected by **{criteria}**")
-
-# ---------------------- Display Strategy Results ----------------------
-
->>>>>>> d4aeb5712c4c0f51302106981294c50967235a43
 if selected.empty:
-    st.warning("No strategy found matching your criteria.")
+    st.warning("⚠️ No strategy found matching your criteria.")
 else:
     lookback = selected["lookback_quarters"].values[0]
     threshold = selected["threshold"].values[0]
-<<<<<<< HEAD
     exit_method = selected["exit_method"].values[0]
     exit_param = selected["exit_param"].values[0]
     
     # Build strategy ID based on exit method
     if exit_method == "holding_period":
-        strategy_id = f"L{lookback}_th{int(threshold*100)}_HOLD_{exit_param}"
+        strategy_id = f"L{lookback}_th{int(threshold*100)}_{exit_param}"
     else:
         # exit_param is like "10pct", extract the number
         pct_value = exit_param.replace("pct", "")
         strategy_id = f"L{lookback}_th{int(threshold*100)}_SELL_{pct_value}"
     
-    st.write(f"📌 **Strategy ID:** `{strategy_id}`")
+    # Header with Strategy ID
+    st.markdown(f"### 📌 Strategy ID: `{strategy_id}`")
     
-    # Display Strategy Parameters
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Lookback Quarters", lookback)
-    with col2:
-        st.metric("Buy Threshold", f"{threshold:.0%}")
-    with col3:
-        st.metric("Exit Method", exit_method.replace("_", " ").title())
-    with col4:
-        st.metric("Exit Parameter", exit_param)
+    # Display Strategy Parameters in a nice layout
+    st.subheader("⚙️ Strategy Parameters")
+    param_col1, param_col2, param_col3, param_col4 = st.columns(4)
+    with param_col1:
+        st.metric("Lookback Quarters", f"{lookback}Q", help="Historical quarters for P/BV calculation")
+    with param_col2:
+        st.metric("Buy Threshold", f"{threshold:.0%}", help="P/BV threshold to trigger buy")
+    with param_col3:
+        exit_method_display = exit_method.replace("_", " ").title()
+        if exit_method == "holding_period":
+            exit_method_display = "Time-Based Exit"
+        else:
+            exit_method_display = "Profit Target Exit"
+        st.metric("Exit Method", exit_method_display)
+    with param_col4:
+        if exit_method == "holding_period":
+            st.metric("Holding Period", exit_param, help="Time to hold position")
+        else:
+            st.metric("Profit Target", f"{exit_param.replace('pct', '')}%", help="Target profit percentage")
 
-    # Display Metrics
+    # Display Performance Metrics
     st.subheader("📊 Performance Metrics")
     
     metrics_col1, metrics_col2, metrics_col3, metrics_col4 = st.columns(4)
@@ -263,173 +281,218 @@ else:
     with metrics_col1:
         if cagr_col:
             cagr_val = selected[cagr_col].values[0]
-            st.metric("CAGR", f"{cagr_val:.2%}" if pd.notna(cagr_val) else "N/A")
+            st.metric("CAGR", f"{cagr_val:.2%}" if pd.notna(cagr_val) else "N/A", 
+                     help="Compound Annual Growth Rate")
     with metrics_col2:
         if sharpe_col:
             sharpe_val = selected[sharpe_col].values[0]
-            st.metric("Sharpe Ratio", f"{sharpe_val:.2f}" if pd.notna(sharpe_val) else "N/A")
+            st.metric("Sharpe Ratio", f"{sharpe_val:.2f}" if pd.notna(sharpe_val) else "N/A",
+                     help="Risk-adjusted return measure")
     with metrics_col3:
         if calmar_col:
             calmar_val = selected[calmar_col].values[0]
-            st.metric("Calmar Ratio", f"{calmar_val:.2f}" if pd.notna(calmar_val) else "N/A")
+            st.metric("Calmar Ratio", f"{calmar_val:.2f}" if pd.notna(calmar_val) else "N/A",
+                     help="Return to max drawdown ratio")
     with metrics_col4:
         dd_val = selected[dd_col].values[0]
-        st.metric("Max Drawdown", f"{dd_val:.2%}" if pd.notna(dd_val) else "N/A")
+        st.metric("Max Drawdown", f"{dd_val:.2%}" if pd.notna(dd_val) else "N/A",
+                 delta=f"{dd_val:.2%}" if pd.notna(dd_val) else None,
+                 help="Maximum peak-to-trough decline")
     
-    # Additional metrics
-    st.write("**Additional Metrics:**")
-    col1, col2, col3 = st.columns(3)
-    with col1:
+    # Additional metrics in a second row
+    metrics_col5, metrics_col6, metrics_col7, metrics_col8 = st.columns(4)
+    with metrics_col5:
         trades_val = selected[trades_col].values[0]
-        st.write(f"**Total Trades:** {int(trades_val) if pd.notna(trades_val) else 0}")
-    with col2:
+        st.metric("Total Trades", f"{int(trades_val):,}" if pd.notna(trades_val) else "N/A",
+                 help="Total number of trades executed")
+    with metrics_col6:
         if "win_ratio" in selected.columns:
             win_ratio_val = selected["win_ratio"].values[0]
-            st.write(f"**Win Ratio:** {win_ratio_val:.2%}" if pd.notna(win_ratio_val) else "N/A")
-    with col3:
-        if "initial_value" in selected.columns and "final_value" in selected.columns:
+            st.metric("Win Ratio", f"{win_ratio_val:.2%}" if pd.notna(win_ratio_val) else "N/A",
+                     help="Percentage of profitable trades")
+    with metrics_col7:
+        if "initial_value" in selected.columns:
             init_val = selected["initial_value"].values[0]
+            st.metric("Initial Capital", f"₹{init_val:,.0f}" if pd.notna(init_val) else "N/A")
+    with metrics_col8:
+        if "final_value" in selected.columns:
             final_val = selected["final_value"].values[0]
-            st.write(f"**Initial:** ₹{init_val:,.0f}" if pd.notna(init_val) else "N/A")
-            st.write(f"**Final:** ₹{final_val:,.0f}" if pd.notna(final_val) else "N/A")
+            st.metric("Final Value", f"₹{final_val:,.0f}" if pd.notna(final_val) else "N/A",
+                     delta=f"₹{final_val - selected['initial_value'].values[0]:,.0f}" if pd.notna(final_val) and "initial_value" in selected.columns else None)
 
-    # Load Equity Curve
+    # Load Equity Curve and Trades
     equity_df = load_equity_curve(strategy_id)
     trades_df = load_trades(strategy_id)
 
     # Download Buttons
     st.subheader("📂 Download Strategy Files")
     
-    col1, col2 = st.columns(2)
-    with col1:
+    download_col1, download_col2, download_col3 = st.columns(3)
+    with download_col1:
         if trades_df is not None:
             trades_csv = trades_df.to_csv(index=False).encode('utf-8')
             st.download_button(
                 label="📥 Download Trade Log (CSV)",
                 data=trades_csv,
                 file_name=f"{strategy_id}_trades.csv",
-                mime="text/csv"
+                mime="text/csv",
+                use_container_width=True
             )
         else:
             st.info("Trade log not available.")
     
-    with col2:
-        if equity_df is not None:
-            equity_csv = equity_df.to_csv().encode('utf-8')
-=======
-    holding = selected["holding_period"].values[0]
-    strategy_id = f"L{lookback}_th{int(threshold*100)}_{holding}"
-
-    st.write(f"📌 **Strategy ID:** `{strategy_id}`")
-
-    # Display Metrics
-    st.subheader("📊 Performance Metrics")
-    st.write(f"**CAGR:** {selected['CAGR'].values[0]:.2%}")
-    st.write(f"**Max Drawdown:** {selected['Max Drawdown'].values[0]:.2%}")
-    st.write(f"**Sharpe Ratio:** {selected['Sharpe'].values[0]:.2f}")
-    st.write(f"**Calmar Ratio:** {selected['Calmar'].values[0]:.2f}")
-    st.write(f"**Trades:** {int(selected['Trades'].values[0])}")
-
-    # Load Equity Curve
-    equity_df = load_equity_curve(strategy_id)
-    trades_path = f"backtest_results/{strategy_id}/trades.csv"
-
-    # 🚀 New: Show Download Buttons if files exist
-    st.subheader("📂 Download Strategy Files")
-
-    col1, col2 = st.columns(2)
-    with col1:
-        if os.path.exists(trades_path):
-            with open(trades_path, "rb") as f:
-                st.download_button(
-                    label="📥 Download Trade Log (CSV)",
-                    data=f,
-                    file_name=f"{strategy_id}_trades.csv",
-                    mime="text/csv"
-                )
-        else:
-            st.error("Trade log not found.")
-
-    with col2:
+    with download_col2:
         if equity_df is not None:
             equity_csv = equity_df.to_csv(index=False).encode('utf-8')
->>>>>>> d4aeb5712c4c0f51302106981294c50967235a43
             st.download_button(
                 label="📥 Download Equity Curve (CSV)",
                 data=equity_csv,
                 file_name=f"{strategy_id}_equity_curve.csv",
-                mime="text/csv"
+                mime="text/csv",
+                use_container_width=True
             )
         else:
-<<<<<<< HEAD
             st.info("Equity curve not available.")
+    
+    with download_col3:
+        if equity_df is not None:
+            # Create a summary CSV
+            summary_data = {
+                'Metric': ['CAGR', 'Sharpe', 'Calmar', 'Max Drawdown', 'Win Ratio', 'Total Trades', 'Initial Value', 'Final Value'],
+                'Value': [
+                    f"{selected[cagr_col].values[0]:.2%}" if cagr_col and pd.notna(selected[cagr_col].values[0]) else "N/A",
+                    f"{selected[sharpe_col].values[0]:.2f}" if sharpe_col and pd.notna(selected[sharpe_col].values[0]) else "N/A",
+                    f"{selected[calmar_col].values[0]:.2f}" if calmar_col and pd.notna(selected[calmar_col].values[0]) else "N/A",
+                    f"{selected[dd_col].values[0]:.2%}" if pd.notna(selected[dd_col].values[0]) else "N/A",
+                    f"{selected['win_ratio'].values[0]:.2%}" if 'win_ratio' in selected.columns and pd.notna(selected['win_ratio'].values[0]) else "N/A",
+                    f"{int(selected[trades_col].values[0])}" if pd.notna(selected[trades_col].values[0]) else "N/A",
+                    f"₹{selected['initial_value'].values[0]:,.0f}" if 'initial_value' in selected.columns and pd.notna(selected['initial_value'].values[0]) else "N/A",
+                    f"₹{selected['final_value'].values[0]:,.0f}" if 'final_value' in selected.columns and pd.notna(selected['final_value'].values[0]) else "N/A"
+                ]
+            }
+            summary_df = pd.DataFrame(summary_data)
+            summary_csv = summary_df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Download Summary (CSV)",
+                data=summary_csv,
+                file_name=f"{strategy_id}_summary.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
 
     # Plot Equity Curve
     if equity_df is not None:
         st.subheader("📉 Equity Curve")
         
+        # Load benchmark if available
+        benchmark_df = load_benchmark()
+        
+        # Create figure with better styling
+        fig, ax = plt.subplots(figsize=(14, 6))
+        
         # Normalize to percentage returns for better visualization
         initial_equity = equity_df["equity"].iloc[0]
         normalized_equity = equity_df["equity"] / initial_equity
         
-        fig, ax = plt.subplots(figsize=(12, 5))
-        ax.plot(equity_df.index, normalized_equity, linewidth=2)
-        ax.axhline(y=1.0, color='gray', linestyle='--', alpha=0.5, label='Initial Capital')
-        ax.set_title(f"Equity Curve - {strategy_id}", fontsize=14, fontweight='bold')
-        ax.set_xlabel("Date", fontsize=12)
-        ax.set_ylabel("Equity (Normalized to 1.0)", fontsize=12)
-        ax.grid(True, alpha=0.3)
-        ax.legend()
+        # Plot strategy
+        ax.plot(equity_df["date"], normalized_equity, linewidth=2.5, label="Strategy", color="#1f77b4", alpha=0.9)
+        
+        # Plot benchmark if available
+        if benchmark_df is not None:
+            # Merge on date
+            merged = pd.merge(equity_df[["date"]], benchmark_df[["date", "benchmark_normalized"]], 
+                            on="date", how="inner")
+            if not merged.empty:
+                ax.plot(merged["date"], merged["benchmark_normalized"], 
+                       linewidth=2, label="NIFTY Benchmark", linestyle="--", color="#ff7f0e", alpha=0.8)
+        
+        ax.axhline(y=1.0, color='gray', linestyle=':', alpha=0.5, linewidth=1, label='Initial Capital')
+        ax.set_title(f"Equity Curve - {strategy_id}", fontsize=16, fontweight='bold', pad=20)
+        ax.set_xlabel("Date", fontsize=12, fontweight='bold')
+        ax.set_ylabel("Normalized Equity (Indexed to 1.0)", fontsize=12, fontweight='bold')
+        ax.grid(True, alpha=0.3, linestyle='--')
+        ax.legend(loc='best', fontsize=11, framealpha=0.9)
         plt.xticks(rotation=45)
         plt.tight_layout()
         st.pyplot(fig)
+        
+        # Additional statistics
+        if benchmark_df is not None and not merged.empty:
+            st.subheader("📊 Strategy vs Benchmark Comparison")
+            comp_col1, comp_col2, comp_col3 = st.columns(3)
+            
+            strategy_return = (normalized_equity.iloc[-1] - 1) * 100
+            benchmark_return = (merged["benchmark_normalized"].iloc[-1] - 1) * 100
+            
+            with comp_col1:
+                st.metric("Strategy Return", f"{strategy_return:.2f}%")
+            with comp_col2:
+                st.metric("Benchmark Return", f"{benchmark_return:.2f}%")
+            with comp_col3:
+                excess_return = strategy_return - benchmark_return
+                st.metric("Excess Return", f"{excess_return:.2f}%", 
+                         delta=f"{excess_return:.2f}%")
     else:
-        st.warning(f"Equity curve not found for strategy: {strategy_id}")
-=======
-            st.error("Equity curve not found.")
+        st.warning(f"⚠️ Equity curve not found for strategy: {strategy_id}")
 
-    # ======================
-    # 📉 Plot Strategy vs Benchmark
-    # ======================
-    if equity_df is not None:
-
-        benchmark_df = load_benchmark()
-
-        # Merge both on date
-        merged = pd.merge(equity_df, benchmark_df, on="date", how="inner")
-
-        st.subheader("📈 Performance vs Benchmark")
-
-        fig, ax = plt.subplots(figsize=(10, 4))
-        ax.plot(merged["date"], merged["strategy_normalized"], label="Strategy", linewidth=2)
-        ax.plot(merged["date"], merged["benchmark_normalized"], label="NIFTY Benchmark", linestyle="--", linewidth=2)
-
-        ax.set_title(f"Strategy vs Benchmark | {strategy_id}")
-        ax.set_xlabel("Date")
-        ax.set_ylabel("Normalized Value (Indexed to 1)")
-        ax.grid(True)
-        ax.legend()
-        st.pyplot(fig)
->>>>>>> d4aeb5712c4c0f51302106981294c50967235a43
+    # Trade Analysis Section
+    if trades_df is not None and not trades_df.empty:
+        st.subheader("📈 Trade Analysis")
+        
+        trade_analysis_col1, trade_analysis_col2 = st.columns(2)
+        
+        with trade_analysis_col1:
+            # Trade returns distribution
+            if "return_pct" in trades_df.columns:
+                fig, ax = plt.subplots(figsize=(8, 5))
+                returns = trades_df["return_pct"].dropna() * 100
+                ax.hist(returns, bins=50, edgecolor='black', alpha=0.7, color='#1f77b4')
+                ax.axvline(x=0, color='red', linestyle='--', linewidth=2, label='Break Even')
+                ax.set_xlabel("Return (%)", fontsize=11, fontweight='bold')
+                ax.set_ylabel("Frequency", fontsize=11, fontweight='bold')
+                ax.set_title("Distribution of Trade Returns", fontsize=13, fontweight='bold')
+                ax.grid(True, alpha=0.3)
+                ax.legend()
+                plt.tight_layout()
+                st.pyplot(fig)
+        
+        with trade_analysis_col2:
+            # Monthly returns
+            if "exit_date" in trades_df.columns and "return_pct" in trades_df.columns:
+                trades_df_monthly = trades_df.copy()
+                trades_df_monthly["year_month"] = trades_df_monthly["exit_date"].dt.to_period("M")
+                monthly_returns = trades_df_monthly.groupby("year_month")["return_pct"].sum() * 100
+                
+                fig, ax = plt.subplots(figsize=(8, 5))
+                monthly_returns.plot(kind='bar', ax=ax, color='#2ca02c', alpha=0.7, edgecolor='black')
+                ax.axhline(y=0, color='red', linestyle='--', linewidth=1)
+                ax.set_xlabel("Month", fontsize=11, fontweight='bold')
+                ax.set_ylabel("Monthly Return (%)", fontsize=11, fontweight='bold')
+                ax.set_title("Monthly Returns", fontsize=13, fontweight='bold')
+                ax.grid(True, alpha=0.3, axis='y')
+                plt.xticks(rotation=45)
+                plt.tight_layout()
+                st.pyplot(fig)
 
 # ================================
 # 🚀 Performance Heatmap Section
 # ================================
+st.markdown("---")
 st.subheader("🔥 Strategy Performance Heatmap")
 
-<<<<<<< HEAD
 # Filter by exit method for heatmap
 heatmap_exit_method = st.selectbox(
     "Select Exit Method for Heatmap:",
     ["holding_period", "sell_threshold"],
-    key="heatmap_exit"
+    key="heatmap_exit",
+    help="Choose which exit method to visualize in the heatmap"
 )
 
 # Filter data for heatmap
 heatmap_df_filtered = master_df[master_df["exit_method"] == heatmap_exit_method]
 
 if heatmap_df_filtered.empty:
-    st.warning(f"No strategies found for exit method: {heatmap_exit_method}")
+    st.warning(f"⚠️ No strategies found for exit method: {heatmap_exit_method}")
 else:
     # Get available metrics
     metric_options = []
@@ -443,15 +506,14 @@ else:
         metric_options.append("max_drawdown")
     elif "Max Drawdown" in master_df.columns:
         metric_options.append("Max Drawdown")
-    if "num_trades" in master_df.columns:
-        metric_options.append("num_trades")
-    elif "Trades" in master_df.columns:
-        metric_options.append("Trades")
+    if "win_ratio" in master_df.columns:
+        metric_options.append("win_ratio")
     
     if metric_options:
         metric = st.selectbox(
             "Select metric to visualize:",
-            metric_options
+            metric_options,
+            help="Choose which performance metric to display in the heatmap"
         )
         
         # Pivot table: Rows = Lookback, Columns = Threshold
@@ -463,65 +525,64 @@ else:
             aggfunc='mean'  # Average if multiple exit params exist
         )
         
-        st.write(f"📊 Heatmap of **{metric}** by Lookback & Threshold (Exit Method: {heatmap_exit_method})")
+        st.write(f"📊 Heatmap of **{metric}** by Lookback & Threshold (Exit Method: {heatmap_exit_method.replace('_', ' ').title()})")
         
         # Format display
-        if metric in ["CAGR", "max_drawdown", "Max Drawdown"]:
-            display_df = heatmap_pivot.style.format("{:.2%}")
+        if metric in ["CAGR", "max_drawdown", "Max Drawdown", "win_ratio"]:
+            display_df = heatmap_pivot.style.format("{:.2%}").background_gradient(cmap='RdYlGn' if metric != "max_drawdown" and metric != "Max Drawdown" else 'RdYlGn_r')
         else:
-            display_df = heatmap_pivot.style.format("{:.2f}")
+            display_df = heatmap_pivot.style.format("{:.2f}").background_gradient(cmap='RdYlGn')
         
-        st.dataframe(display_df, use_container_width=True)
+        st.dataframe(display_df, use_container_width=True, height=400)
         
-        # Plot the heatmap
-        fig, ax = plt.subplots(figsize=(10, 6))
-        im = ax.imshow(heatmap_pivot, aspect='auto', cmap='RdYlGn' if metric in ["CAGR", "Sharpe", "Calmar"] else 'RdYlGn_r')
-        fig.colorbar(im, ax=ax, label=metric)
+        # Plot the heatmap with better styling
+        fig, ax = plt.subplots(figsize=(12, 7))
+        
+        # Choose colormap based on metric
+        if metric in ["CAGR", "Sharpe", "Calmar", "win_ratio"]:
+            cmap = 'RdYlGn'
+        else:
+            cmap = 'RdYlGn_r'
+        
+        im = ax.imshow(heatmap_pivot, aspect='auto', cmap=cmap, interpolation='nearest')
+        cbar = fig.colorbar(im, ax=ax, label=metric.replace('_', ' ').title(), pad=0.02)
+        cbar.ax.tick_params(labelsize=10)
         
         # Label formatting
         ax.set_xticks(range(len(heatmap_pivot.columns)))
-        ax.set_xticklabels([f"{x:.0%}" for x in heatmap_pivot.columns], rotation=45)
-        ax.set_xlabel("Buy Threshold", fontsize=12)
+        ax.set_xticklabels([f"{x:.0%}" for x in heatmap_pivot.columns], rotation=45, ha='right', fontsize=10)
+        ax.set_xlabel("Buy Threshold", fontsize=12, fontweight='bold')
         
         ax.set_yticks(range(len(heatmap_pivot.index)))
-        ax.set_yticklabels(heatmap_pivot.index)
-        ax.set_ylabel("Lookback Quarters", fontsize=12)
+        ax.set_yticklabels([f"{int(x)}Q" for x in heatmap_pivot.index], fontsize=10)
+        ax.set_ylabel("Lookback Quarters", fontsize=12, fontweight='bold')
         
-        ax.set_title(f"Heatmap of {metric} ({heatmap_exit_method})", fontsize=14, fontweight='bold')
+        ax.set_title(f"Heatmap of {metric.replace('_', ' ').title()} ({heatmap_exit_method.replace('_', ' ').title()})", 
+                    fontsize=14, fontweight='bold', pad=15)
+        
+        # Add text annotations
+        for i in range(len(heatmap_pivot.index)):
+            for j in range(len(heatmap_pivot.columns)):
+                value = heatmap_pivot.iloc[i, j]
+                if pd.notna(value):
+                    if metric in ["CAGR", "max_drawdown", "Max Drawdown", "win_ratio"]:
+                        text = f"{value:.1%}"
+                    else:
+                        text = f"{value:.2f}"
+                    ax.text(j, i, text, ha="center", va="center", 
+                           color="white" if abs(value - heatmap_pivot.min().min()) < abs(value - heatmap_pivot.max().max()) else "black",
+                           fontsize=8, fontweight='bold')
         
         plt.tight_layout()
         st.pyplot(fig)
     else:
-        st.warning("No valid metrics found for heatmap.")
-=======
-metric = st.selectbox(
-    "Select metric to visualize:",
-    ["CAGR", "Sharpe", "Calmar", "Max Drawdown", "Trades"]
+        st.warning("⚠️ No valid metrics found for heatmap.")
+
+# Footer
+st.markdown("---")
+st.markdown(
+    "<div style='text-align: center; color: #666; padding: 20px;'>"
+    "📊 P/BV Backtest Dashboard | Generated with Streamlit"
+    "</div>",
+    unsafe_allow_html=True
 )
-
-# Pivot table: Rows = Lookback, Columns = Threshold
-heatmap_df = master_df.pivot_table(
-    index="lookback_quarters",
-    columns="threshold",
-    values=metric
-)
-
-st.write(f"📊 Heatmap of **{metric}** by Lookback & Threshold")
-st.dataframe(heatmap_df.style.format("{:.2%}" if metric != "Trades" else "{:.0f}"))
-
-# Plot the heatmap
-fig, ax = plt.subplots(figsize=(8, 5))
-cax = ax.matshow(heatmap_df, interpolation='nearest')
-fig.colorbar(cax)
-
-# Label formatting
-ax.set_xticks(range(len(heatmap_df.columns)))
-ax.set_xticklabels(heatmap_df.columns, rotation=45)
-ax.set_yticks(range(len(heatmap_df.index)))
-ax.set_yticklabels(heatmap_df.index)
-ax.set_xlabel("Threshold")
-ax.set_ylabel("Lookback Quarters")
-ax.set_title(f"Heatmap of {metric}")
-
-st.pyplot(fig)
->>>>>>> d4aeb5712c4c0f51302106981294c50967235a43
