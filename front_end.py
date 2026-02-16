@@ -329,14 +329,29 @@ if selected.empty:
 else:
     # Safely extract values with type conversion
     try:
-        lookback = float(selected["lookback_quarters"].values[0])
-        threshold = float(selected["threshold"].values[0])
-        exit_method = str(selected["exit_method"].values[0])
-        exit_param = str(selected["exit_param"].values[0])
-    except (IndexError, KeyError, ValueError) as e:
+        lookback_raw = selected["lookback_quarters"].values[0]
+        threshold_raw = selected["threshold"].values[0]
+        exit_method_raw = selected["exit_method"].values[0]
+        exit_param_raw = selected["exit_param"].values[0]
+        
+        # Convert to proper types
+        lookback = float(lookback_raw) if pd.notna(lookback_raw) else None
+        threshold = float(threshold_raw) if pd.notna(threshold_raw) else None
+        exit_method = str(exit_method_raw) if pd.notna(exit_method_raw) else ""
+        exit_param = str(exit_param_raw) if pd.notna(exit_param_raw) else ""
+        
+        # Validate values
+        if lookback is None or threshold is None or not exit_method or not exit_param:
+            st.error(f"❌ Invalid strategy parameters extracted")
+            st.error(f"Lookback: {lookback}, Threshold: {threshold}, Exit Method: {exit_method}, Exit Param: {exit_param}")
+            st.stop()
+            
+    except (IndexError, KeyError, ValueError, TypeError) as e:
         st.error(f"❌ Error extracting strategy parameters: {e}")
         st.error(f"Selected dataframe shape: {selected.shape}")
         st.error(f"Selected columns: {list(selected.columns)}")
+        if not selected.empty:
+            st.error(f"First row: {selected.iloc[0].to_dict()}")
         st.stop()
     
     # Build strategy ID based on exit method
@@ -357,26 +372,46 @@ else:
     # Display Strategy Parameters in a nice layout
     st.subheader("⚙️ Strategy Parameters")
     param_col1, param_col2, param_col3, param_col4 = st.columns(4)
+    
     with param_col1:
-        st.metric("Lookback Quarters", f"{lookback_int}", help="Historical quarters for P/BV calculation")
+        lookback_display = str(lookback_int) if lookback_int is not None else "N/A"
+        st.metric("Lookback Quarters", lookback_display, help="Historical quarters for P/BV calculation")
+    
     with param_col2:
         try:
-            threshold_pct = f"{threshold:.0%}"
+            if threshold is not None:
+                threshold_pct = f"{threshold:.0%}"
+            else:
+                threshold_pct = "N/A"
         except (ValueError, TypeError):
-            threshold_pct = f"{threshold*100:.0f}%"
+            try:
+                threshold_pct = f"{float(threshold)*100:.0f}%" if threshold is not None else "N/A"
+            except:
+                threshold_pct = "N/A"
         st.metric("Buy Threshold", threshold_pct, help="P/BV threshold to trigger buy")
+    
     with param_col3:
-        exit_method_display = exit_method.replace("_", " ").title()
-        if exit_method == "holding_period":
-            exit_method_display = "Time-Based Exit"
+        if exit_method:
+            if exit_method == "holding_period":
+                exit_method_display = "Time-Based Exit"
+            elif exit_method == "sell_threshold":
+                exit_method_display = "Profit Target Exit"
+            else:
+                exit_method_display = exit_method.replace("_", " ").title()
         else:
-            exit_method_display = "Profit Target Exit"
+            exit_method_display = "N/A"
         st.metric("Exit Method", exit_method_display)
+    
     with param_col4:
         if exit_method == "holding_period":
-            st.metric("Holding Period", exit_param, help="Time to hold position")
+            exit_param_display = str(exit_param) if exit_param else "N/A"
+            st.metric("Holding Period", exit_param_display, help="Time to hold position")
         else:
-            st.metric("Profit Target", f"{exit_param.replace('pct', '')}%", help="Target profit percentage")
+            if exit_param:
+                pct_display = exit_param.replace("pct", "") + "%"
+            else:
+                pct_display = "N/A"
+            st.metric("Profit Target", pct_display, help="Target profit percentage")
 
     # Display Performance Metrics
     st.subheader("📊 Performance Metrics")
