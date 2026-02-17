@@ -685,45 +685,6 @@ else:
     else:
         st.warning(f"⚠️ Equity curve not found for strategy: {strategy_id}")
 
-    # Trade Analysis Section
-    if trades_df is not None and not trades_df.empty:
-        st.subheader("📈 Trade Analysis")
-        
-        trade_analysis_col1, trade_analysis_col2 = st.columns(2)
-        
-        with trade_analysis_col1:
-            # Trade returns distribution
-            if "return_pct" in trades_df.columns:
-                fig, ax = plt.subplots(figsize=(8, 5))
-                returns = trades_df["return_pct"].dropna() * 100
-                ax.hist(returns, bins=50, edgecolor='black', alpha=0.7, color='#1f77b4')
-                ax.axvline(x=0, color='red', linestyle='--', linewidth=2, label='Break Even')
-                ax.set_xlabel("Return (%)", fontsize=11, fontweight='bold')
-                ax.set_ylabel("Frequency", fontsize=11, fontweight='bold')
-                ax.set_title("Distribution of Trade Returns", fontsize=13, fontweight='bold')
-                ax.grid(True, alpha=0.3)
-                ax.legend()
-                plt.tight_layout()
-                st.pyplot(fig)
-        
-        with trade_analysis_col2:
-            # Monthly returns
-            if "exit_date" in trades_df.columns and "return_pct" in trades_df.columns:
-                trades_df_monthly = trades_df.copy()
-                trades_df_monthly["year_month"] = trades_df_monthly["exit_date"].dt.to_period("M")
-                monthly_returns = trades_df_monthly.groupby("year_month")["return_pct"].sum() * 100
-                
-                fig, ax = plt.subplots(figsize=(8, 5))
-                monthly_returns.plot(kind='bar', ax=ax, color='#2ca02c', alpha=0.7, edgecolor='black')
-                ax.axhline(y=0, color='red', linestyle='--', linewidth=1)
-                ax.set_xlabel("Month", fontsize=11, fontweight='bold')
-                ax.set_ylabel("Monthly Return (%)", fontsize=11, fontweight='bold')
-                ax.set_title("Monthly Returns", fontsize=13, fontweight='bold')
-                ax.grid(True, alpha=0.3, axis='y')
-                plt.xticks(rotation=45)
-                plt.tight_layout()
-                st.pyplot(fig)
-
 # ================================
 # 🚀 Performance Heatmap Section
 # ================================
